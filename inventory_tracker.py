@@ -1,3 +1,15 @@
+"""
+Shop Inventory Application
+Author: jcast6
+Created on: 12/29/23
+Description: This application is designed to manage and track inventory for a shop. 
+It features a graphical user interface built with Tkinter and uses MySQL for data storage.
+
+This software provided is a work in progress, with continuos updates applied. Please be sure to check for new versions on
+https://github.com/jcast6/Inventory-Control
+
+"""
+
 import tkinter as tk
 import tkinter.messagebox
 import mysql.connector
