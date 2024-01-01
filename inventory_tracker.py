@@ -48,7 +48,7 @@ def log_change_to_db(item_name, original_quantity, new_quantity):
     db = mysql.connector.connect(
         host='...',
         database='shop_inventory',
-        user='root',
+        user='...',
         password='...'
     )
     cursor = db.cursor()
@@ -180,7 +180,7 @@ def save_changes():
     if confirmation:
         # Connect to the MySQL database
         db = mysql.connector.connect(
-            host='localhost',
+            host='...',
             database='shop_inventory',
             user='...',
             password='...'
@@ -237,7 +237,7 @@ search_var.trace('w', update_dropdown)
 
 # Fetch data from the MySQL database and populate the inventory dictionary
 db = mysql.connector.connect(
-    host="localhost",
+    host="...",
     user="...",
     password="...",
     database="shop_inventory"
