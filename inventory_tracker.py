@@ -46,10 +46,10 @@ def is_valid_quantity(input_str):
     
 def log_change_to_db(item_name, original_quantity, new_quantity):
     db = mysql.connector.connect(
-        host='localhost',
+        host='...',
         database='shop_inventory',
         user='root',
-        password='peter'
+        password='...'
     )
     cursor = db.cursor()
 
@@ -182,8 +182,8 @@ def save_changes():
         db = mysql.connector.connect(
             host='localhost',
             database='shop_inventory',
-            user='root',
-            password='peter'
+            user='...',
+            password='...'
         )
         cursor = db.cursor()
 
@@ -238,8 +238,8 @@ search_var.trace('w', update_dropdown)
 # Fetch data from the MySQL database and populate the inventory dictionary
 db = mysql.connector.connect(
     host="localhost",
-    user="root",
-    password="peter",
+    user="...",
+    password="...",
     database="shop_inventory"
 )
 cursor = db.cursor()
