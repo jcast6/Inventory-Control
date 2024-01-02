@@ -9,12 +9,15 @@ The software provided is a work in progress, with continuos updates applied. Ple
 https://github.com/jcast6/Inventory-Control
 
 """
-
 import tkinter as tk
 import tkinter.messagebox
 import mysql.connector
 from tkinter import ttk
 from PIL import Image, ImageTk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+current_user_id = None  # Global variable to store the current user's ID
 
 
 def main_app():
@@ -38,6 +41,7 @@ def main_app():
     # inventory dictionary to store inventory data from the database
     inventory = {}
 
+    search_inventory = {}  # Dictionary for searching
 
     def is_valid_quantity(input_str):
         try:
@@ -46,7 +50,7 @@ def main_app():
         except ValueError:
             return False
         
-    def log_change_to_db(item_name, original_quantity, new_quantity):
+    def log_change_to_db(item_name, original_quantity, new_quantity, current_user_id):
         db = mysql.connector.connect(
             host='localhost',
             database='shop_inventory',
@@ -56,8 +60,8 @@ def main_app():
         cursor = db.cursor()
 
         # Insert the change record into changes_log
-        insert_query = "INSERT INTO changes_log (item_name, original_quantity, new_quantity) VALUES (%s, %s, %s)"
-        cursor.execute(insert_query, (item_name, original_quantity, new_quantity))
+        insert_query = "INSERT INTO changes_log (item_name, original_quantity, new_quantity, emp_id) VALUES (%s, %s, %s, %s)"
+        cursor.execute(insert_query, (item_name, original_quantity, new_quantity, current_user_id))
 
         db.commit()
         db.close()
@@ -109,7 +113,7 @@ def main_app():
         else:
             tkinter.messagebox.showwarning("Invalid Item", "The specified item was not found in the inventory.")
 
-        log_change_to_db(item_name, current_quantity, new_quantity)
+        log_change_to_db(item_name, current_quantity, new_quantity, current_user_id)
 
     def remove_quantity():
         selection = item_combobox.get()
@@ -147,7 +151,7 @@ def main_app():
             update_change_listbox(full_key, -quantity_change)
 
             # Log the change to the database
-            log_change_to_db(item_name, current_quantity, new_quantity)
+            log_change_to_db(item_name, current_quantity, new_quantity, current_user_id)
         else:
             tkinter.messagebox.showwarning("Invalid Item", "The specified item was not found in the inventory.")
 
@@ -156,7 +160,88 @@ def main_app():
     def reset_quantity():
         quantity_change_entry.delete(0, tk.END)
 
+    def update_dropdown(*args):
+        typed = search_var.get().lower()
+        if typed:
+            # Filter and update the dropdown list to show only matching items
+            data = [f"{random_id} - {item}" for item, (random_id, _) in search_inventory.items() if typed in item.lower() or typed in random_id]
+        else:
+            # If no input, show all items
+            data = list(inventory.keys())
+        item_combobox['values'] = data
 
+    search_var = tk.StringVar(window)
+    search_var.trace('w', update_dropdown)
+
+
+    # Create a ttk Notebook for the Table of Contents
+    toc_notebook = ttk.Notebook(window)
+    toc_notebook.grid(row=8, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
+    # Create frames for each tab
+    daily_frame = ttk.Frame(toc_notebook)
+    weekly_frame = ttk.Frame(toc_notebook)
+    monthly_frame = ttk.Frame(toc_notebook)
+
+    toc_notebook.add(daily_frame, text='Daily Usage')
+    toc_notebook.add(weekly_frame, text='Weekly Usage')
+    toc_notebook.add(monthly_frame, text='Monthly Usage')
+
+
+    toc_frames = {
+        "Daily Usage": daily_frame,
+        "Weekly Usage": weekly_frame,
+        "Monthly Usage": monthly_frame
+    }
+
+    def draw_graph(item_name, time_period):
+        # Convert time_period to lowercase to match the keys in toc_frames
+        time_period = time_period
+
+        # Clear previous graph
+        for widget in toc_frames[time_period].winfo_children():
+            widget.destroy()
+
+        # Placeholder logic - Replace this with actual database queries and graph generation
+        fig, ax = plt.subplots()
+        # Example plot - Replace with your data
+        ax.plot([1, 2, 3], [1, 2, 3])
+        canvas = FigureCanvasTkAgg(fig, master=toc_frames[time_period])
+        canvas.draw()
+        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+
+
+    def on_tab_selected(event):
+        selected_tab = event.widget.tab(event.widget.index("current"), "text")
+        selected_item = item_combobox.get().split(" - ")[1] if " - " in item_combobox.get() else None
+        if selected_item:
+            draw_graph(selected_item, selected_tab)
+
+
+    
+    def item_selected(event):
+        # Extract the item name from the selection
+        selection = item_combobox.get()
+        item_name = selection.split(" - ")[1] if " - " in selection else selection
+        original_quantity = inventory.get(selection, {}).get("Quantity", "N/A")
+        update_original_and_new_quantity(item_name, original_quantity, original_quantity)
+        current_tab = toc_notebook.tab(toc_notebook.index("current"), "text").lower()
+        draw_graph(item_name, current_tab)
+
+
+    # Function to update the listbox with changes
+    def update_change_listbox(item_key, original_quantity, quantity_change):
+        # Calculate the new quantity
+        new_quantity = original_quantity + quantity_change
+
+        # Format the change text correctly
+        change_text = f"{item_key}: {original_quantity} + {quantity_change} = {new_quantity}"
+
+        # Insert the formatted change text into the listbox
+        changes_listbox.insert(tk.END, change_text)
+
+        # Split item_key to get just the item name for logging to the database
+        item_name = item_key.split(" - ")[1]
+        log_change_to_db(item_name, original_quantity, new_quantity, current_user_id)
 
     def update_original_and_new_quantity(item_name, original_quantity, new_quantity):
         original_label.config(text=f"Original Quantity: {original_quantity}")
@@ -164,12 +249,13 @@ def main_app():
 
 
     def item_selected(event):
-        # Extract the item name from the selection
         selection = item_combobox.get()
         item_name = selection.split(" - ")[1] if " - " in selection else selection
         original_quantity = inventory.get(selection, {}).get("Quantity", "N/A")
         update_original_and_new_quantity(item_name, original_quantity, original_quantity)
-
+        current_tab = toc_notebook.tab(toc_notebook.index("current"), "text")
+        if item_name:
+            draw_graph(item_name, current_tab)
 
     def confirm_large_change(quantity_change):
         return tkinter.messagebox.askyesno("Confirm Large Change", f"Are you sure you want to change the quantity by {quantity_change}?")
@@ -202,41 +288,6 @@ def main_app():
             # Close the GUI window
             window.destroy()
 
-
-    # Function to update the listbox with changes
-    def update_change_listbox(item_key, original_quantity, quantity_change):
-        # Calculate the new quantity
-        new_quantity = original_quantity + quantity_change
-
-        # Format the change text correctly
-        change_text = f"{item_key}: {original_quantity} + {quantity_change} = {new_quantity}"
-
-        # Insert the formatted change text into the listbox
-        changes_listbox.insert(tk.END, change_text)
-
-        # Split item_key to get just the item name for logging to the database
-        item_name = item_key.split(" - ")[1]
-        log_change_to_db(item_name, original_quantity, new_quantity)
-
-
-
-    search_inventory = {}  # Dictionary for searching
-
-
-    def update_dropdown(*args):
-        typed = search_var.get().lower()
-        if typed:
-            # Filter and update the dropdown list to show only matching items
-            data = [f"{random_id} - {item}" for item, (random_id, _) in search_inventory.items() if typed in item.lower() or typed in random_id]
-        else:
-            # If no input, show all items
-            data = list(inventory.keys())
-        item_combobox['values'] = data
-
-    search_var = tk.StringVar(window)
-    search_var.trace('w', update_dropdown)
-
-
     # Fetch data from the MySQL database and populate the inventory dictionary
     db = mysql.connector.connect(
         host="localhost",
@@ -250,20 +301,19 @@ def main_app():
     for (item_name, random_id, quantity) in cursor:
         inventory_key = f"{random_id} - {item_name}"
         inventory[inventory_key] = {"Quantity": quantity}
-        search_inventory[item_name] = (random_id, quantity)  # Store for searching
+        search_inventory[item_name] = (random_id, quantity)  # Store for searchin
 
+    toc_notebook.bind("<<NotebookTabChanged>>", on_tab_selected)
 
     # Load and display the company logo image
-    logo_image = Image.open("inven_con.png")  
+    logo_image = Image.open("github_projects/inven_con.png")  
     logo_photo = ImageTk.PhotoImage(logo_image)
     logo_label = tk.Label(window, image=logo_photo)
     logo_label.grid(row=0, column=0, padx=10, pady=10, sticky='nw')  # Place the label at the top left corner
 
-
     # Modify the item_combobox to use the updated inventory keys
     item_combobox = ttk.Combobox(window, textvariable=search_var)
     item_combobox.set("Select Item - ID")
-
 
     # Label styling
     label_style = ttk.Style()
@@ -310,8 +360,14 @@ def main_app():
     window.mainloop()
 
 
+# Tkinter window for the login page
+login_window = tk.Tk()
+login_window.title("Employee Login")
+login_window.geometry("250x250")
+
 #### Login and validation checking. ####
 def validate_login():
+    global current_user_id
     emp_id = emp_id_entry.get()
     last_name = last_name_entry.get()
     
@@ -333,21 +389,14 @@ def validate_login():
     db.close()
 
     if result:
+        # keep the user_id saved
+        current_user_id = emp_id
         # If the employee ID and last name are valid, close the login window and open the main application window
         login_window.destroy()
         open_main_window()
     else:
         # Show an error message if the login is invalid
         tkinter.messagebox.showerror("Login Failed", "Invalid Employee ID or Last Name")
-
-
-def open_main_window():
-    main_app()
-
-
-# Tkinter window for the login page
-login_window = tk.Tk()
-login_window.title("Employee Login")
 
 # Create and place the widgets
 tk.Label(login_window, text="Employee ID").pack()
@@ -359,6 +408,9 @@ last_name_entry.pack()
 login_button = tk.Button(login_window, text="Login", command=validate_login)
 login_button.pack()
 
+
+def open_main_window():
+    main_app()
+
 # Start the Tkinter event loop
 login_window.mainloop()
-
