@@ -9,16 +9,22 @@ The software provided is a work in progress, with continuos updates applied. Ple
 https://github.com/jcast6/Inventory-Control
 
 """
+
 import tkinter as tk
 import tkinter.messagebox
 import mysql.connector
 from tkinter import ttk
 from PIL import Image, ImageTk
+import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from datetime import datetime
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-current_user_id = None  # Global variable to store the current user's ID
+matplotlib.use('TkAgg')  # Ensure that the Tkinter backend is used for rendering
 
+current_user_id = None  # Global variable to store the current user's ID
+graph_canvas = None
 
 def main_app():
     # GUI window
@@ -40,16 +46,10 @@ def main_app():
     changes = {}
     # inventory dictionary to store inventory data from the database
     inventory = {}
-
-    search_inventory = {}  # Dictionary for searching
-
-    def is_valid_quantity(input_str):
-        try:
-            value = float(input_str)
-            return value >= 0
-        except ValueError:
-            return False
+    # Dictionary for searching
+    search_inventory = {}
         
+
     def log_change_to_db(item_name, original_quantity, new_quantity, current_user_id):
         db = mysql.connector.connect(
             host='localhost',
@@ -59,12 +59,23 @@ def main_app():
         )
         cursor = db.cursor()
 
+        # Calculate the quantity change
+        quantity_change = new_quantity - original_quantity
+
         # Insert the change record into changes_log
-        insert_query = "INSERT INTO changes_log (item_name, original_quantity, new_quantity, emp_id) VALUES (%s, %s, %s, %s)"
-        cursor.execute(insert_query, (item_name, original_quantity, new_quantity, current_user_id))
+        insert_query = "INSERT INTO changes_log (item_name, original_quantity, new_quantity, quantity_change, emp_id) VALUES (%s, %s, %s, %s, %s)"
+        cursor.execute(insert_query, (item_name, original_quantity, new_quantity, quantity_change, current_user_id))
 
         db.commit()
         db.close()
+
+
+    def is_valid_quantity(input_str):
+        try:
+            value = float(input_str)
+            return value >= 0
+        except ValueError:
+            return False
         
 
     def add_quantity():
@@ -176,46 +187,119 @@ def main_app():
 
     # Create a ttk Notebook for the Table of Contents
     toc_notebook = ttk.Notebook(window)
-    toc_notebook.grid(row=8, column=0, columnspan=2, padx=10, pady=10, sticky='nsew')
+    toc_notebook.grid(row=0, column=1, columnspan=20, padx=10, pady=10, sticky='nsew')
+
     # Create frames for each tab
     daily_frame = ttk.Frame(toc_notebook)
     weekly_frame = ttk.Frame(toc_notebook)
-    monthly_frame = ttk.Frame(toc_notebook)
-
+    # monthly_frame = ttk.Frame(toc_notebook)
     toc_notebook.add(daily_frame, text='Daily Usage')
     toc_notebook.add(weekly_frame, text='Weekly Usage')
-    toc_notebook.add(monthly_frame, text='Monthly Usage')
+    # toc_notebook.add(monthly_frame, text='Monthly Usage')
 
+    # Dropdown for month selection
+    months = ['All Months'] + [datetime(2000, m, 1).strftime('%B') for m in range(1, 13)]  # List of months with 'All Months' as the first option
+    month_var = tk.StringVar(window)
+    month_combobox = ttk.Combobox(window, textvariable=month_var, values=months, state="readonly")
+    month_combobox.current(0)  # Default to 'All Months'
+    month_combobox.grid(row=1, column=1, padx=10, pady=5, sticky='w')
 
     toc_frames = {
         "Daily Usage": daily_frame,
         "Weekly Usage": weekly_frame,
-        "Monthly Usage": monthly_frame
+        # "Monthly Usage": monthly_frame
     }
 
-    def draw_graph(item_name, time_period):
-        # Convert time_period to lowercase to match the keys in toc_frames
-        time_period = time_period
+    
+    def draw_graph(item_name, time_period, selected_month = None):
+        global graph_canvas
+        if not item_name:  # If no item is selected, do nothing
+            return
 
-        # Clear previous graph
-        for widget in toc_frames[time_period].winfo_children():
-            widget.destroy()
+        # Clear previous graph if it exists
+        if graph_canvas:
+            graph_canvas.get_tk_widget().destroy()
 
-        # Placeholder logic - Replace this with actual database queries and graph generation
-        fig, ax = plt.subplots()
-        # Example plot - Replace with your data
-        ax.plot([1, 2, 3], [1, 2, 3])
-        canvas = FigureCanvasTkAgg(fig, master=toc_frames[time_period])
-        canvas.draw()
-        canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        # Connect to the database
+        db = mysql.connector.connect(
+            host='localhost',
+            user='root',
+            password='peter',
+            database='shop_inventory'
+        )
+        cursor = db.cursor()
+
+        # Modify the SQL query to filter data based on the selected month
+        month_condition = ""
+        if selected_month and selected_month != 'All Months':
+            month_number = datetime.strptime(selected_month, '%B').month
+            month_condition = " AND MONTH(change_date) = %s" % month_number
+
+        if time_period == "Daily Usage":
+            cursor.execute("""
+                SELECT DATE(change_date) as date, SUM(quantity_change) as total_change 
+                FROM changes_log 
+                WHERE item_name = %s""" + month_condition + """
+                GROUP BY DATE(change_date) 
+                ORDER BY DATE(change_date) ASC
+                """, (item_name,))
+        elif time_period == "Weekly Usage":
+            cursor.execute("""
+                SELECT YEARWEEK(change_date) as week, SUM(quantity_change) as total_change 
+                FROM changes_log 
+                WHERE item_name = %s 
+                GROUP BY YEARWEEK(change_date) 
+                ORDER BY YEARWEEK(change_date) ASC
+                """, (item_name,))
+
+        # Fetch the data
+        data = cursor.fetchall()
+        dates = [x[0] for x in data]
+        quantities = [x[1] for x in data]
+
+        fig, ax = plt.subplots(figsize=(10, 4))  # Adjust the size as needed
+        ax.plot(dates, quantities, marker='o')  # Add markers for each data point
+        # Adjust the plot margins
+        plt.subplots_adjust(bottom=0.2)  # Increase the bottom margin to allow for more space
+
+
+        # Format the graph based on the time_period
+        if time_period == "Daily Usage":
+            ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))  # Set interval to show every day
+            plt.xticks(rotation = 90, fontsize = 6)
+        elif time_period == "Weekly Usage":
+            # Convert week numbers to the starting date of the week for labeling
+            start_dates = [datetime.strptime(f'{date}-1', "%Y%W-%w") for date in dates]
+            ax.set_xticks(range(len(start_dates)))  # Set x-ticks to be the start dates of weeks
+            ax.set_xticklabels([date.strftime('%Y-%m-%d') for date in start_dates], rotation=45)
+
+        # Embedding the figure in the Tkinter window
+        graph_canvas = FigureCanvasTkAgg(fig, master=toc_frames[time_period])
+        graph_canvas.draw()
+        graph_widget = graph_canvas.get_tk_widget()
+        graph_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        # Close the database connection
+        cursor.close()
+        db.close()
 
 
     def on_tab_selected(event):
         selected_tab = event.widget.tab(event.widget.index("current"), "text")
         selected_item = item_combobox.get().split(" - ")[1] if " - " in item_combobox.get() else None
         if selected_item:
-            draw_graph(selected_item, selected_tab)
+            if selected_tab in ["Daily Usage", "Weekly Usage"]:  # Remove "Monthly Usage" from the condition
+                draw_graph(selected_item, selected_tab)
 
+
+    # Function to update the graph when a new month is selected
+    def update_graph_for_month(event):
+        selected_month = month_var.get()
+        selected_item = item_combobox.get().split(" - ")[1] if " - " in item_combobox.get() else None
+        selected_tab = toc_notebook.tab(toc_notebook.index("current"), "text")
+        if selected_item:
+            draw_graph(selected_item, selected_tab, selected_month)
 
     
     def item_selected(event):
@@ -243,6 +327,7 @@ def main_app():
         item_name = item_key.split(" - ")[1]
         log_change_to_db(item_name, original_quantity, new_quantity, current_user_id)
 
+
     def update_original_and_new_quantity(item_name, original_quantity, new_quantity):
         original_label.config(text=f"Original Quantity: {original_quantity}")
         new_label.config(text=f"New Quantity: {new_quantity}")
@@ -256,6 +341,7 @@ def main_app():
         current_tab = toc_notebook.tab(toc_notebook.index("current"), "text")
         if item_name:
             draw_graph(item_name, current_tab)
+
 
     def confirm_large_change(quantity_change):
         return tkinter.messagebox.askyesno("Confirm Large Change", f"Are you sure you want to change the quantity by {quantity_change}?")
@@ -301,9 +387,8 @@ def main_app():
     for (item_name, random_id, quantity) in cursor:
         inventory_key = f"{random_id} - {item_name}"
         inventory[inventory_key] = {"Quantity": quantity}
-        search_inventory[item_name] = (random_id, quantity)  # Store for searchin
+        search_inventory[item_name] = (random_id, quantity)  # Store for searching
 
-    toc_notebook.bind("<<NotebookTabChanged>>", on_tab_selected)
 
     # Load and display the company logo image
     logo_image = Image.open("github_projects/inven_con.png")  
@@ -332,6 +417,10 @@ def main_app():
 
     # Bind the item selection event to the item_selected function
     item_combobox.bind("<<ComboboxSelected>>", item_selected)
+
+
+    # Bind the month_combobox to update the graph when the selection changes
+    month_combobox.bind("<<ComboboxSelected>>", update_graph_for_month)
 
 
     # GUI components in the window using grid
