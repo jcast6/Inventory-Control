@@ -10,6 +10,7 @@ https://github.com/jcast6/Inventory-Control
 
 """
 
+
 import tkinter as tk
 import tkinter.messagebox
 import mysql.connector
@@ -18,19 +19,22 @@ from PIL import Image, ImageTk
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from datetime import datetime
+import calendar
+from datetime import datetime, timedelta
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-matplotlib.use('TkAgg')  # Ensure that the Tkinter backend is used for rendering
+ # Tkinter backend is used for rendering
+matplotlib.use('TkAgg') 
 
-current_user_id = None  # Global variable to store the current user's ID
+# Global variable to store the current user's ID
+current_user_id = None
 graph_canvas = None
 
 def main_app():
     # GUI window
     window = tk.Tk()
     window.title("Shop Inventory")
-    window.geometry("700x600") # set fixed window size
+    window.geometry("900x700") # set fixed window size
 
 
     # Callback function to close the database connection and exit
@@ -213,7 +217,9 @@ def main_app():
     
     def draw_graph(item_name, time_period, selected_month = None):
         global graph_canvas
-        if not item_name:  # If no item is selected, do nothing
+        
+        # If no item is selected, do nothing
+        if not item_name:
             return
 
         # Clear previous graph if it exists
@@ -229,50 +235,67 @@ def main_app():
         )
         cursor = db.cursor()
 
-        # Modify the SQL query to filter data based on the selected month
+        # SQL query to filter data based on the selected month
         month_condition = ""
         if selected_month and selected_month != 'All Months':
             month_number = datetime.strptime(selected_month, '%B').month
-            month_condition = " AND MONTH(change_date) = %s" % month_number
+            month_condition = f" AND MONTH(change_date) = {month_number}"
 
+        # base query with GROUP BY clause
+        base_query = """
+            SELECT DATE(change_date) as date, SUM(quantity_change) as total_change 
+            FROM changes_log 
+            WHERE item_name = %s
+            """
+
+        # Append month condition if necessary
+        if selected_month and selected_month != 'All Months':
+            month_number = datetime.strptime(selected_month, '%B').month
+            base_query += f" AND MONTH(change_date) = {month_number}"
+
+        # Define group and order clauses based on the time period
         if time_period == "Daily Usage":
-            cursor.execute("""
-                SELECT DATE(change_date) as date, SUM(quantity_change) as total_change 
-                FROM changes_log 
-                WHERE item_name = %s""" + month_condition + """
-                GROUP BY DATE(change_date) 
-                ORDER BY DATE(change_date) ASC
-                """, (item_name,))
-        elif time_period == "Weekly Usage":
-            cursor.execute("""
-                SELECT YEARWEEK(change_date) as week, SUM(quantity_change) as total_change 
-                FROM changes_log 
-                WHERE item_name = %s 
-                GROUP BY YEARWEEK(change_date) 
-                ORDER BY YEARWEEK(change_date) ASC
-                """, (item_name,))
+            base_query += " GROUP BY DATE(change_date) ORDER BY DATE(change_date)"
+        else:  # Weekly Usage
+            base_query += " GROUP BY YEARWEEK(change_date) ORDER BY YEARWEEK(change_date)"
 
+        # Execute the query
+        cursor.execute(base_query, (item_name,))
+
+    
         # Fetch the data
         data = cursor.fetchall()
-        dates = [x[0] for x in data]
+        dates = [datetime.strptime(str(x[0]), "%Y-%m-%d") for x in data]
         quantities = [x[1] for x in data]
 
-        fig, ax = plt.subplots(figsize=(10, 4))  # Adjust the size as needed
+        fig, ax = plt.subplots(figsize=(10, 4))  # Adjust the size of plots
+
+        # Check if dates list is empty
+        if not dates:
+            # empty list case here
+            print("No data available for the selected item and time period.")
+            return  # Skip drawing the graph
+
         ax.plot(dates, quantities, marker='o')  # Add markers for each data point
-        # Adjust the plot margins
-        plt.subplots_adjust(bottom=0.2)  # Increase the bottom margin to allow for more space
+        plt.subplots_adjust(bottom=0.2)
 
-
-        # Format the graph based on the time_period
         if time_period == "Daily Usage":
+            first_date = dates[0].replace(day=1)  # First day of the month
+            last_day = calendar.monthrange(dates[0].year, dates[0].month)[1]  # Get the last day of the month
+            last_date = dates[0].replace(day=last_day)  # Last day of the month
+
+            dates_range = mdates.drange(first_date, last_date + timedelta(days=1), timedelta(days=1))
+            ax.set_xticks(dates_range)
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-            ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))  # Set interval to show every day
-            plt.xticks(rotation = 90, fontsize = 6)
+            plt.xticks(rotation=90, fontsize=6)
         elif time_period == "Weekly Usage":
-            # Convert week numbers to the starting date of the week for labeling
             start_dates = [datetime.strptime(f'{date}-1', "%Y%W-%w") for date in dates]
+            # Add one more week
+            last_week = start_dates[-1] + timedelta(weeks=1)
+            start_dates.append(last_week)
             ax.set_xticks(range(len(start_dates)))  # Set x-ticks to be the start dates of weeks
-            ax.set_xticklabels([date.strftime('%Y-%m-%d') for date in start_dates], rotation=45)
+            ax.set_xticklabels([date.strftime('%Y-%W') for date in start_dates], rotation=45)  # Year-Week format
+
 
         # Embedding the figure in the Tkinter window
         graph_canvas = FigureCanvasTkAgg(fig, master=toc_frames[time_period])
@@ -391,7 +414,7 @@ def main_app():
 
 
     # Load and display the company logo image
-    logo_image = Image.open("github_projects/inven_con.png")  
+    logo_image = Image.open("github_projects/logo-png.png")  
     logo_photo = ImageTk.PhotoImage(logo_image)
     logo_label = tk.Label(window, image=logo_photo)
     logo_label.grid(row=0, column=0, padx=10, pady=10, sticky='nw')  # Place the label at the top left corner
@@ -408,12 +431,16 @@ def main_app():
     quantity_change_label = ttk.Label(window, text="Change Quantity:", style="Custom.TLabel")
     quantity_change_entry = ttk.Entry(window)
     new_label = ttk.Label(window, text="New Quantity: N/A", style="Custom.TLabel")
-    # Button styling
-    add_button = tk.Button(window, text="\u2795 Add Quantity", command=add_quantity, font=("Arial", 12), bg='blue', fg='white')
-    remove_button = tk.Button(window, text="\u2796 Remove Quantity", command=remove_quantity, font=("Arial", 12), bg='red', fg='white')
-    save_button = tk.Button(window, text="Save Changes", command=save_changes, font=("Arial", 12), bg="green", fg="white")
-    reset_button = tk.Button(window, text="Reset", command=reset_quantity, font=("Arial", 12),bg='orange', fg='black')
+    
+    # Button dimensions
+    button_width = 18  # Adjust width as needed
+    button_height = 1  # Adjust height as needed
 
+    # Button styling with fixed dimensions
+    add_button = tk.Button(window, text="\u2795 Add Quantity", command=add_quantity, font=("Calibri", 9), bg='blue', fg='white', width=button_width, height=button_height)
+    remove_button = tk.Button(window, text="\u2796 Remove Quantity", command=remove_quantity, font=("Calibri", 9), bg='red', fg='white', width=button_width, height=button_height)
+    save_button = tk.Button(window, text="Save Changes", command=save_changes, font=("Calibri", 9), bg="green", fg="white", width=button_width, height=button_height)
+    reset_button = tk.Button(window, text="Reset", command=reset_quantity, font=("Calibri", 9), bg='orange', fg='black', width=button_width, height=button_height)
 
     # Bind the item selection event to the item_selected function
     item_combobox.bind("<<ComboboxSelected>>", item_selected)
