@@ -9,8 +9,7 @@ The software provided is a work in progress, with continuos updates applied. Ple
 https://github.com/jcast6/Inventory-Control
 
 """
-
-
+import threading
 import tkinter as tk
 import tkinter.messagebox
 import mysql.connector
@@ -22,6 +21,9 @@ import matplotlib.dates as mdates
 import calendar
 from datetime import datetime, timedelta
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import cv2
+from pyzbar.pyzbar import decode
+import time
 
  # Tkinter backend is used for rendering
 matplotlib.use('TkAgg') 
@@ -397,6 +399,91 @@ def main_app():
             # Close the GUI window
             window.destroy()
 
+
+    def scan_code():
+        print("scan_code called")
+        scanner_thread = threading.Thread(target=run_scanner)
+        scanner_thread.start()
+
+
+    def run_scanner():
+        print("run_scanner started")
+        try:
+            # Initialize the camera
+            cap = cv2.VideoCapture(0)
+            if not cap.isOpened():
+                print("Unable to access the camera")
+                return
+
+            cap.set(3, 640)  # Set width
+            cap.set(4, 480)  # Set height
+            camera = True
+
+            while camera:
+                success, frame = cap.read()
+                if not success:
+                    print("Failed to grab frame")
+                    break
+
+                decoded_objects = decode(frame)
+                if decoded_objects:
+                    for code in decoded_objects:
+                        random_id = code.data.decode('utf-8')
+                        print("Scanned Code:", random_id)
+
+                        item_data = get_item_data_from_db(random_id)
+                        if item_data:
+                            # Assuming item_data[0] is the item_name
+                            item_name = item_data[0]
+                            print(f"Item found: {item_name}")
+
+                            # Use tkinter's after method to safely update GUI from another thread
+                            window.after(0, lambda: item_combobox.set(f"{random_id} - {item_name}"))
+                            window.after(0, lambda: update_original_and_new_quantity(item_name, item_data[2], item_data[2]))
+
+                            # Break out of the loop after successful scan
+                            camera = False
+                        else:
+                            print("Item not found in database")
+
+                        # Sleep to prevent immediate re-scanning
+                        time.sleep(2)
+
+                cv2.imshow("Scanner Window", frame)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+
+        except Exception as e:
+            print("An error occurred in run_scanner:", e)
+        finally:
+            if 'cap' in locals() and cap.isOpened():
+                cap.release()
+            cv2.destroyAllWindows()
+            print("Scanner stopped")
+        
+    def get_item_data_from_db(random_id):
+        # Connect to the MySQL database
+        db = mysql.connector.connect(
+            host='localhost',
+            user='root',
+            password='peter',
+            database='shop_inventory'
+        )
+        cursor = db.cursor()
+
+        # Query to find an item by its random_id
+        query = "SELECT * FROM shop_inventory_count WHERE random_id = %s"
+        cursor.execute(query, (random_id,))
+
+        # Fetch one record
+        item_data = cursor.fetchone()
+
+        # Close the database connection
+        cursor.close()
+        db.close()
+
+        return item_data       
+
     # Fetch data from the MySQL database and populate the inventory dictionary
     db = mysql.connector.connect(
         host="localhost",
@@ -449,6 +536,10 @@ def main_app():
     # Bind the month_combobox to update the graph when the selection changes
     month_combobox.bind("<<ComboboxSelected>>", update_graph_for_month)
 
+    # Add a button for scanning
+    scan_button = tk.Button(window, text="Search by Code Scan", command=scan_code)
+    scan_button.grid(row=8, column=0, pady=5)  # Adjust grid position as needed
+
 
     # GUI components in the window using grid
     item_combobox.grid(row=1, column=0, padx=10, pady=5, sticky='w')
@@ -474,6 +565,7 @@ def main_app():
 
     # Start the GUI application
     window.mainloop()
+    
 
 
 # Tkinter window for the login page
@@ -529,4 +621,5 @@ def open_main_window():
     main_app()
 
 # Start the Tkinter event loop
+
 login_window.mainloop()
