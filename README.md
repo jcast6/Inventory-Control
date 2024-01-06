@@ -17,5 +17,21 @@
 ##### (Subtract logic not using original quantity to subtract in the changes log only, currently being worked on).
 ![image](https://github.com/jcast6/Inventory-Control/assets/89822103/81d94b12-6f90-4eba-b9c8-3ae2eeb47b57)
 
+# Select months to track inventory daily usage and changes.
+##### Some months are will not display daily data properly for specific months due to single change in inventory.
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/08899777-4359-4b81-92b8-c40f7eece134)
+
+# Recent updates
+
+# QR code and Barcode scanner 
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/fad5b674-a697-4d91-87fc-26635a745d28)
+## Scanner window opens after code search button is clicked
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/977b7b20-6c76-439b-9501-e1ce4e4ec8e2)
+
+## User can scan a qr code
+
+
+
+
 
 
