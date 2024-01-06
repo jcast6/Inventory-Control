@@ -1,13 +1,21 @@
 # Inventory-Control
 
+# Simple Login Window
 ![image](https://github.com/jcast6/Inventory-Control/assets/89822103/ab52eb81-06a9-4b1f-a78e-b7210ad0f165)
 
-
+# Main inventory page
 ![image](https://github.com/jcast6/Inventory-Control/assets/89822103/e42d781b-ea72-4779-9263-b22f3e61934b)
 
+# User selects an item
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/69407330-c988-45ad-9af3-97b3cac760a2)
 
-![image](https://github.com/jcast6/Inventory-Control/assets/89822103/88994a7d-1cb4-49ef-93e2-7de11eb83c2e)
+# User Adds or Removes a number pieces of selected item. 
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/4bec69be-9ec4-4e71-9571-5614be4abc35)
+### User adds number of items with changes logged.
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/1105d136-1ac7-49fb-988b-5a4204035d6f)
+### User subtracts number of items with changes logged.
+##### (Subtract logic not using original quantity to subtract in the changes log only, currently being worked on).
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/81d94b12-6f90-4eba-b9c8-3ae2eeb47b57)
 
-![image](https://github.com/jcast6/Inventory-Control/assets/89822103/a429572d-9f01-4941-b6ab-587134739547)
 
-![image](https://github.com/jcast6/Inventory-Control/assets/89822103/fe640594-8c83-4c25-8345-922d4bacb3ea)
+
