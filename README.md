@@ -29,6 +29,11 @@
 ![image](https://github.com/jcast6/Inventory-Control/assets/89822103/977b7b20-6c76-439b-9501-e1ce4e4ec8e2)
 
 ## User can scan a qr code
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/530d4d44-39fc-496e-861d-4f79b641f5f0)
+
+# Coming Fixes:
+I will add the qr code and bar code results to the main GUI. This will allow for quick item selection if inventory is large. The recent changes log will be updated to fix subtraction logic issues. And the reporting for daily usage will be fixed.
+
 
 
 
