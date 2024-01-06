@@ -46,7 +46,7 @@ Scanning Process: The user holds a QR code in front of the camera. On successful
 ![image](https://github.com/jcast6/Inventory-Control/assets/89822103/530d4d44-39fc-496e-861d-4f79b641f5f0)
 
 # Data returned from database when qr code is scanned
-Data Handling: The application parses the QR code data to retrieve the item's unique identifier. The GUI does not update to show the scanned item's details, it is currently being worked on.
+Data Handling: The application parses the QR code data to retrieve the item's unique identifier. The GUI does not update to show the scanned item's details, it is currently being worked on. The item details display in the terminal as they are in the databasr when the qr code is scanned.
 ![image](https://github.com/jcast6/Inventory-Control/assets/89822103/eae5ab78-a9ee-4f5b-8d48-b08a14c48cb9)
 
 
