@@ -9,6 +9,7 @@ The software provided is a work in progress, with continuos updates applied. Ple
 https://github.com/jcast6/Inventory-Control
 
 """
+
 import threading
 import tkinter as tk
 import tkinter.messagebox
@@ -24,6 +25,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import cv2
 from pyzbar.pyzbar import decode
 import time
+import json
 
  # Tkinter backend is used for rendering
 matplotlib.use('TkAgg') 
@@ -55,26 +57,6 @@ def main_app():
     # Dictionary for searching
     search_inventory = {}
         
-
-    def log_change_to_db(item_name, original_quantity, new_quantity, current_user_id):
-        db = mysql.connector.connect(
-            host='localhost',
-            database='shop_inventory',
-            user='root',
-            password='peter'
-        )
-        cursor = db.cursor()
-
-        # Calculate the quantity change
-        quantity_change = new_quantity - original_quantity
-
-        # Insert the change record into changes_log
-        insert_query = "INSERT INTO changes_log (item_name, original_quantity, new_quantity, quantity_change, emp_id) VALUES (%s, %s, %s, %s, %s)"
-        cursor.execute(insert_query, (item_name, original_quantity, new_quantity, quantity_change, current_user_id))
-
-        db.commit()
-        db.close()
-
 
     def is_valid_quantity(input_str):
         try:
@@ -130,7 +112,7 @@ def main_app():
         else:
             tkinter.messagebox.showwarning("Invalid Item", "The specified item was not found in the inventory.")
 
-        log_change_to_db(item_name, current_quantity, new_quantity, current_user_id)
+        log_change_to_db(item_name, current_quantity, new_quantity, current_user_id, random_id)
 
     def remove_quantity():
         selection = item_combobox.get()
@@ -153,22 +135,35 @@ def main_app():
                 if not confirm_large_change(quantity_change):
                     return
 
+            # Capture the original quantity before making any changes
+            original_quantity = inventory[full_key]["Quantity"]
+
+            # Calculate the new quantity after subtracting the change
+            new_quantity = original_quantity - quantity_change
+
+            # Prevent new quantity from becoming negative
+            if new_quantity < 0:
+                tkinter.messagebox.showerror("Invalid Quantity", "Removal amount exceeds the current quantity.")
+                return
+
             # Update the changes dictionary with the quantity change
             if full_key in changes:
                 changes[full_key] -= quantity_change
             else:
                 changes[full_key] = -quantity_change
 
-            # Update the quantity displayed in the GUI
-            current_quantity = inventory[full_key]["Quantity"]
-            new_quantity = current_quantity - quantity_change
+            # Update the inventory with the new quantity
             inventory[full_key]["Quantity"] = new_quantity
-            quantity_label.config(text=f"Quantity: {new_quantity}")
-            update_original_and_new_quantity(full_key, current_quantity, new_quantity)
-            update_change_listbox(full_key, -quantity_change)
 
+            # Update the GUI to reflect the new quantity
+            quantity_label.config(text=f"Quantity: {new_quantity}")
+            update_original_and_new_quantity(full_key, original_quantity, new_quantity)
+            
             # Log the change to the database
-            log_change_to_db(item_name, current_quantity, new_quantity, current_user_id)
+            log_change_to_db(item_name, original_quantity, new_quantity, current_user_id, random_id)
+
+            # Update the recent changes listbox. Pass the original quantity (unchanged) and the negative quantity change
+            update_change_listbox(full_key, original_quantity, -quantity_change)
         else:
             tkinter.messagebox.showwarning("Invalid Item", "The specified item was not found in the inventory.")
 
@@ -217,7 +212,7 @@ def main_app():
     }
 
     
-    def draw_graph(item_name, time_period, selected_month = None):
+    def draw_graph(item_name, time_period, selected_month=None):
         global graph_canvas
         
         # If no item is selected, do nothing
@@ -264,11 +259,21 @@ def main_app():
         # Execute the query
         cursor.execute(base_query, (item_name,))
 
-    
         # Fetch the data
         data = cursor.fetchall()
-        dates = [datetime.strptime(str(x[0]), "%Y-%m-%d") for x in data]
-        quantities = [x[1] for x in data]
+        
+        # Process the data to create a list of dates, but only include valid date strings
+        dates = []
+        for x in data:
+            if x[0] is not None:
+                try:
+                    date = datetime.strptime(str(x[0]), "%Y-%m-%d")
+                    dates.append(date)
+                except ValueError:
+                    # If the date string is in the wrong format, skip it
+                    continue
+
+        quantities = [x[1] for x in data if x[0] is not None]
 
         fig, ax = plt.subplots(figsize=(10, 4))  # Adjust the size of plots
 
@@ -326,6 +331,32 @@ def main_app():
         if selected_item:
             draw_graph(selected_item, selected_tab, selected_month)
 
+
+    # Function to update the listbox with changes
+    def update_change_listbox(item_key, original_quantity, quantity_change):
+        # Calculate the new quantity
+        new_quantity = original_quantity + quantity_change if quantity_change >= 0 else original_quantity - abs(quantity_change)
+
+        # Determine the operation symbol and format the change appropriately
+        operation = "+" if quantity_change >= 0 else "-"
+        adjusted_quantity_change = abs(quantity_change)
+
+        # Format the change text correctly for display in the listbox
+        change_text = f"{item_key}: {original_quantity} {operation} {adjusted_quantity_change} = {new_quantity}"
+
+        # Insert the formatted change text into the listbox
+        changes_listbox.insert(tk.END, change_text)
+
+        # Split item_key to get just the item name for logging to the database
+        item_name = item_key.split(" ")[1]
+        log_change_to_db(item_name, original_quantity, new_quantity, current_user_id, random_id)
+
+
+    def update_original_and_new_quantity(item_name, original_quantity, new_quantity):
+        original_label.config(text=f"Original Quantity: {original_quantity}")
+        new_label.config(text=f"New Quantity: {new_quantity}")
+
+
     
     def item_selected(event):
         # Extract the item name from the selection
@@ -337,27 +368,6 @@ def main_app():
         draw_graph(item_name, current_tab)
 
 
-    # Function to update the listbox with changes
-    def update_change_listbox(item_key, original_quantity, quantity_change):
-        # Calculate the new quantity
-        new_quantity = original_quantity + quantity_change
-
-        # Format the change text correctly
-        change_text = f"{item_key}: {original_quantity} + {quantity_change} = {new_quantity}"
-
-        # Insert the formatted change text into the listbox
-        changes_listbox.insert(tk.END, change_text)
-
-        # Split item_key to get just the item name for logging to the database
-        item_name = item_key.split(" - ")[1]
-        log_change_to_db(item_name, original_quantity, new_quantity, current_user_id)
-
-
-    def update_original_and_new_quantity(item_name, original_quantity, new_quantity):
-        original_label.config(text=f"Original Quantity: {original_quantity}")
-        new_label.config(text=f"New Quantity: {new_quantity}")
-
-
     def item_selected(event):
         selection = item_combobox.get()
         item_name = selection.split(" - ")[1] if " - " in selection else selection
@@ -366,7 +376,7 @@ def main_app():
         current_tab = toc_notebook.tab(toc_notebook.index("current"), "text")
         if item_name:
             draw_graph(item_name, current_tab)
-
+    
 
     def confirm_large_change(quantity_change):
         return tkinter.messagebox.askyesno("Confirm Large Change", f"Are you sure you want to change the quantity by {quantity_change}?")
@@ -400,16 +410,42 @@ def main_app():
             window.destroy()
 
 
+    def get_item_data_from_db(random_id):
+        db = mysql.connector.connect(
+            host='localhost',
+            user='root',
+            password='peter',
+            database='shop_inventory'
+        )
+        cursor = db.cursor()
+
+        # Query to find an item by its random_id
+        query = "SELECT category, ItemName, quantity, random_id FROM shop_inventory_count WHERE random_id = %s"
+        print("Executing query:", query)  # Debugging line
+        print("With random_id:", random_id)  # Debugging line
+
+        try:
+            cursor.execute(query, (random_id,))
+            item_data = cursor.fetchone()
+            print("Query result:", item_data)  # Debugging line
+        except Exception as e:
+            print("An error occurred while executing the query:", e)
+            item_data = None
+
+        cursor.close()
+        db.close()
+
+        return item_data
+
     def scan_code():
         print("scan_code called")
         scanner_thread = threading.Thread(target=run_scanner)
         scanner_thread.start()
 
-
     def run_scanner():
         print("run_scanner started")
         try:
-            # Initialize the camera
+            # start camera
             cap = cv2.VideoCapture(0)
             if not cap.isOpened():
                 print("Unable to access the camera")
@@ -417,37 +453,44 @@ def main_app():
 
             cap.set(3, 640)  # Set width
             cap.set(4, 480)  # Set height
-            camera = True
+            camera = True    # camera is on
 
             while camera:
                 success, frame = cap.read()
                 if not success:
-                    print("Failed to grab frame")
+                    print("Failed to grab frame") # camera did not open
                     break
-
+                
+                # scan code in front of camera
                 decoded_objects = decode(frame)
                 if decoded_objects:
                     for code in decoded_objects:
-                        random_id = code.data.decode('utf-8')
-                        print("Scanned Code:", random_id)
+                        qr_data = code.data.decode('utf-8')
+                        print("Scanned Code:", qr_data)
 
-                        item_data = get_item_data_from_db(random_id)
-                        if item_data:
-                            # Assuming item_data[0] is the item_name
-                            item_name = item_data[0]
-                            print(f"Item found: {item_name}")
-
-                            # Use tkinter's after method to safely update GUI from another thread
-                            window.after(0, lambda: item_combobox.set(f"{random_id} - {item_name}"))
-                            window.after(0, lambda: update_original_and_new_quantity(item_name, item_data[2], item_data[2]))
-
-                            # Break out of the loop after successful scan
-                            camera = False
-                        else:
-                            print("Item not found in database")
+                        try:
+                            qr_data_json = json.loads(qr_data)
+                            random_id = qr_data_json.get("random_id")
+                            if random_id:
+                                item_data = get_item_data_from_db(random_id)
+                                if item_data:
+                                    category, ItemName, quantity, _ = item_data
+                                    print(f"Item found: {ItemName}, Category: {category}, Quantity: {quantity}")
+                                    ################ Update GUI and handle the data as here ######################
+                                    # 
+                                    #
+                                    #
+                                    #
+                                    camera = False
+                                else:
+                                    print("Item not found in database")
+                            else:
+                                print("Random ID not found in QR data")
+                        except json.JSONDecodeError:
+                            print("Invalid QR code format")
 
                         # Sleep to prevent immediate re-scanning
-                        time.sleep(2)
+                        time.sleep(5)
 
                 cv2.imshow("Scanner Window", frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -460,29 +503,32 @@ def main_app():
                 cap.release()
             cv2.destroyAllWindows()
             print("Scanner stopped")
-        
-    def get_item_data_from_db(random_id):
-        # Connect to the MySQL database
+
+          
+    def log_change_to_db(item_name, original_quantity, new_quantity, current_user_id, random_id):
         db = mysql.connector.connect(
             host='localhost',
+            database='shop_inventory',
             user='root',
-            password='peter',
-            database='shop_inventory'
+            password='peter'
         )
         cursor = db.cursor()
 
-        # Query to find an item by its random_id
-        query = "SELECT * FROM shop_inventory_count WHERE random_id = %s"
-        cursor.execute(query, (random_id,))
+        # Calculate the quantity change
+        quantity_change = new_quantity - original_quantity
 
-        # Fetch one record
-        item_data = cursor.fetchone()
+        # Get the current timestamp
+        change_time = datetime.now()
+        change_date = change_time.date()  # Extracts just the date part of the datetime
 
-        # Close the database connection
-        cursor.close()
+        # Insert the change record into changes_log
+        insert_query = "INSERT INTO changes_log(item_name, original_quantity, new_quantity, quantity_change, change_date, change_time, emp_id, random_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+        cursor.execute(insert_query, 
+                    (item_name, original_quantity, new_quantity, quantity_change, change_date, change_time, current_user_id, random_id))
+
+        db.commit()
         db.close()
 
-        return item_data       
 
     # Fetch data from the MySQL database and populate the inventory dictionary
     db = mysql.connector.connect(
