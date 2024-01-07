@@ -8,7 +8,8 @@ Purpose: Secure access to the inventory management system. Employees enter their
 
 # Main inventory page
 Layout: Features a dropdown to select items, buttons for modifying item quantities, and visualizing inventory changes. Displays the current inventory, allows for the selection of items, and visualizes inventory changes over time.
-![image](https://github.com/jcast6/Inventory-Control/assets/89822103/e42d781b-ea72-4779-9263-b22f3e61934b)
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/55c482d5-d163-455c-8f93-f1a7f9098726)
+
 
 # User selects an item
 Implementation: A dropdown menu (ComboBox) populated with inventory items. Users select an item to view or modify its details, including current quantity.
