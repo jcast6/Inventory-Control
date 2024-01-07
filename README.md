@@ -3,6 +3,7 @@ This Shop Inventory Management System is a GUI application built using Python an
 
 # Simple Login Window
 Purpose: Secure access to the inventory management system. Employees enter their ID and last name to log in. The system verifies credentials from the MySQL database.
+
 ![image](https://github.com/jcast6/Inventory-Control/assets/89822103/ab52eb81-06a9-4b1f-a78e-b7210ad0f165)
 
 # Main inventory page
