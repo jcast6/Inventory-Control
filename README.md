@@ -21,8 +21,8 @@ Threshold Confirmation: For large quantity changes, a confirmation prompt appear
 ### User adds number of items with changes logged.
 ![image](https://github.com/jcast6/Inventory-Control/assets/89822103/1105d136-1ac7-49fb-988b-5a4204035d6f)
 ### User subtracts number of items with changes logged.
-##### (Subtract logic not using original quantity to subtract in the changes log only, currently being worked on).
-![image](https://github.com/jcast6/Inventory-Control/assets/89822103/81d94b12-6f90-4eba-b9c8-3ae2eeb47b57)
+![image](https://github.com/jcast6/Inventory-Control/assets/89822103/f97e4042-4085-423d-aff0-1cb4d01df7ce)
+
 
 # Select months to track inventory daily usage and changes.
 Select Months to Track Inventory Daily Usage and Changes
@@ -51,7 +51,7 @@ Data Handling: The application parses the QR code data to retrieve the item's un
 
 
 # Coming Fixes:
-I will add the qr code and bar code results to the main GUI. This will allow for quick item selection if inventory is large. The recent changes log will be updated to fix subtraction logic issues. And the reporting for daily usage will be fixed.
+I will add the qr code and bar code results to the main GUI. This will allow for quick item selection if inventory is large. And the reporting for daily usage will be fixed.
 
 
 
