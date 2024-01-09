@@ -34,11 +34,15 @@ matplotlib.use('TkAgg')
 current_user_id = None
 graph_canvas = None
 
+# Global variables for images to prevent garbage collection
+global_button_images = {}
+
 def main_app():
     # GUI window
     window = tk.Tk()
     window.title("Shop Inventory")
     window.geometry("900x700") # set fixed window size
+    window.configure(background = 'light grey')
 
 
     # Callback function to close the database connection and exit
@@ -188,14 +192,14 @@ def main_app():
 
     # Create a ttk Notebook for the Table of Contents
     toc_notebook = ttk.Notebook(window)
-    toc_notebook.grid(row=0, column=1, columnspan=20, padx=10, pady=10, sticky='nsew')
+    toc_notebook.grid(row = 0, column = 1, columnspan = 20, padx = 10, pady = 10, sticky = 'nsew')
 
     # Create frames for each tab
     daily_frame = ttk.Frame(toc_notebook)
-    weekly_frame = ttk.Frame(toc_notebook)
+    # weekly_frame = ttk.Frame(toc_notebook)
     # monthly_frame = ttk.Frame(toc_notebook)
-    toc_notebook.add(daily_frame, text='Daily Usage')
-    toc_notebook.add(weekly_frame, text='Weekly Usage')
+    toc_notebook.add(daily_frame, text = 'Daily Usage')
+    # toc_notebook.add(weekly_frame, text = 'Weekly Usage')
     # toc_notebook.add(monthly_frame, text='Monthly Usage')
 
     # Dropdown for month selection
@@ -203,16 +207,14 @@ def main_app():
     month_var = tk.StringVar(window)
     month_combobox = ttk.Combobox(window, textvariable=month_var, values=months, state="readonly")
     month_combobox.current(0)  # Default to 'All Months'
-    month_combobox.grid(row=1, column=1, padx=10, pady=5, sticky='w')
+    month_combobox.grid(row = 1, column = 1, padx = 10, pady = 5, sticky = 'w')
 
     toc_frames = {
         "Daily Usage": daily_frame,
-        "Weekly Usage": weekly_frame,
-        # "Monthly Usage": monthly_frame
     }
 
     
-    def draw_graph(item_name, time_period, selected_month=None):
+    def draw_graph(item_name, time_period, selected_month = None):
         global graph_canvas
         
         # If no item is selected, do nothing
@@ -275,7 +277,7 @@ def main_app():
 
         quantities = [x[1] for x in data if x[0] is not None]
 
-        fig, ax = plt.subplots(figsize=(10, 4))  # Adjust the size of plots
+        fig, ax = plt.subplots(figsize=(8, 4))  # Adjust the size of plots
 
         # Check if dates list is empty
         if not dates:
@@ -286,11 +288,11 @@ def main_app():
         ax.plot(dates, quantities, marker='o')  # Add markers for each data point
         plt.subplots_adjust(bottom=0.2)
 
+        # if tab selected is Daily usage
         if time_period == "Daily Usage":
             first_date = dates[0].replace(day=1)  # First day of the month
             last_day = calendar.monthrange(dates[0].year, dates[0].month)[1]  # Get the last day of the month
             last_date = dates[0].replace(day=last_day)  # Last day of the month
-
             dates_range = mdates.drange(first_date, last_date + timedelta(days=1), timedelta(days=1))
             ax.set_xticks(dates_range)
             ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
@@ -303,6 +305,28 @@ def main_app():
             ax.set_xticks(range(len(start_dates)))  # Set x-ticks to be the start dates of weeks
             ax.set_xticklabels([date.strftime('%Y-%W') for date in start_dates], rotation=45)  # Year-Week format
 
+
+        # Check if the data list is empty or has only one data point
+        if not data or len(data) == 1:
+            # Handle the empty or single data point case
+            if not data:
+                print("No data available for the selected item and time period.")
+                # You might want to clear the previous plot or display a message on the plot
+            else:
+                # If there's only one point, plot it with additional settings
+                single_date = datetime.strptime(str(data[0][0]), "%Y-%m-%d")
+                single_quantity = data[0][1]
+                ax.plot(single_date, single_quantity, 'o')  # Plot the single point
+
+                # Set a reasonable range around the single date for x-axis
+                start_date = single_date - timedelta(days=10)
+                end_date = single_date + timedelta(days=15)
+                ax.set_xlim(start_date, end_date)
+
+                # Formatting the date on the x-axis
+                ax.xaxis.set_major_locator(mdates.DayLocator(interval=5))  # Show every 5 days
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+                plt.xticks(rotation=90, fontsize=6)
 
         # Embedding the figure in the Tkinter window
         graph_canvas = FigureCanvasTkAgg(fig, master=toc_frames[time_period])
@@ -353,11 +377,10 @@ def main_app():
 
 
     def update_original_and_new_quantity(item_name, original_quantity, new_quantity):
-        original_label.config(text=f"Original Quantity: {original_quantity}")
-        new_label.config(text=f"New Quantity: {new_quantity}")
+        original_label.config(text = f"Original Quantity: {original_quantity}")
+        new_label.config(text = f"New Quantity: {new_quantity}")
 
 
-    
     def item_selected(event):
         # Extract the item name from the selection
         selection = item_combobox.get()
@@ -412,10 +435,10 @@ def main_app():
 
     def get_item_data_from_db(random_id):
         db = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='peter',
-            database='shop_inventory'
+            host = 'localhost',
+            user = 'root',
+            password = 'peter',
+            database = 'shop_inventory'
         )
         cursor = db.cursor()
 
@@ -439,7 +462,7 @@ def main_app():
 
     def scan_code():
         print("scan_code called")
-        scanner_thread = threading.Thread(target=run_scanner)
+        scanner_thread = threading.Thread(target = run_scanner)
         scanner_thread.start()
 
     def run_scanner():
@@ -532,10 +555,10 @@ def main_app():
 
     # Fetch data from the MySQL database and populate the inventory dictionary
     db = mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="peter",
-        database="shop_inventory"
+        host = "localhost",
+        user = "root",
+        password = "peter",
+        database = "shop_inventory"
     )
     cursor = db.cursor()
     # Modify the SQL query to include random_id
@@ -550,30 +573,92 @@ def main_app():
     logo_image = Image.open("github_projects/logo-png.png")  
     logo_photo = ImageTk.PhotoImage(logo_image)
     logo_label = tk.Label(window, image=logo_photo)
-    logo_label.grid(row=0, column=0, padx=10, pady=10, sticky='nw')  # Place the label at the top left corner
+    logo_label.grid(row = 0, column = 0, padx = 10, pady = 10, sticky = 'nw')  # Place the label at the top left corner
 
     # Modify the item_combobox to use the updated inventory keys
     item_combobox = ttk.Combobox(window, textvariable=search_var)
-    item_combobox.set("Select Item - ID")
+    item_combobox.set("Item Name Here - ID")
 
     # Label styling
     label_style = ttk.Style()
     label_style.configure("Custom.TLabel", font=("Arial", 12), )
-    quantity_label = ttk.Label(window, text="Quantity: ", style="Custom.TLabel")
-    original_label = ttk.Label(window, text="Original Quantity: N/A", style="Custom.TLabel")
-    quantity_change_label = ttk.Label(window, text="Change Quantity:", style="Custom.TLabel")
+    quantity_label = ttk.Label(window, text="Quantity: ", style="Custom.TLabel", background= 'light grey')
+    original_label = ttk.Label(window, text="Original Quantity: N/A", style="Custom.TLabel", background= 'light grey')
+    quantity_change_label = ttk.Label(window, text="Change Quantity:", style="Custom.TLabel", background= 'light grey')
     quantity_change_entry = ttk.Entry(window)
-    new_label = ttk.Label(window, text="New Quantity: N/A", style="Custom.TLabel")
+    new_label = ttk.Label(window, text="New Quantity: N/A", style="Custom.TLabel",  background= 'light grey')
     
     # Button dimensions
     button_width = 18  # Adjust width as needed
-    button_height = 1  # Adjust height as needed
+    button_height = 0.6  # Adjust height as needed
 
-    # Button styling with fixed dimensions
-    add_button = tk.Button(window, text="\u2795 Add Quantity", command=add_quantity, font=("Calibri", 9), bg='blue', fg='white', width=button_width, height=button_height)
-    remove_button = tk.Button(window, text="\u2796 Remove Quantity", command=remove_quantity, font=("Calibri", 9), bg='red', fg='white', width=button_width, height=button_height)
-    save_button = tk.Button(window, text="Save Changes", command=save_changes, font=("Calibri", 9), bg="green", fg="white", width=button_width, height=button_height)
-    reset_button = tk.Button(window, text="Reset", command=reset_quantity, font=("Calibri", 9), bg='orange', fg='black', width=button_width, height=button_height)
+    # Default button border thickness
+    original_thickness = 1  # Adjust this value as needed
+    original_color = 'systemButtonFace'  # Default system color for buttons
+
+
+    # Functions for button hover effect using a border frame
+    def on_enter(e, frame):
+        frame.config(highlightbackground='cyan', highlightthickness=1)
+
+    def on_leave(e, frame):
+        frame.config(highlightbackground='black', highlightthickness=1)
+
+
+    # Create frames as borders for each button
+    add_button_frame = tk.Frame(window, highlightbackground = 'black', highlightthickness = 1)
+    remove_button_frame = tk.Frame(window, highlightbackground = 'black', highlightthickness = 1)
+    save_button_frame = tk.Frame(window, highlightbackground = 'black', highlightthickness = 1)
+    reset_button_frame = tk.Frame(window, highlightbackground = 'black', highlightthickness = 1)
+    scan_button_frame = tk.Frame(window, highlightbackground = 'black', highlightthickness = 1)
+
+
+    # Load and resize the background image for the 'Add Quantity' button
+    add_button_image = Image.open("github_projects/button_colors/addition_background.png")
+    resized_add_button_image = add_button_image.resize((110, 30))  # Resize the image (width, height)
+    add_button_photo = ImageTk.PhotoImage(resized_add_button_image)
+    global_button_images['add_button'] = add_button_photo  # Keep a reference
+
+    # Load and resize images for other buttons (replace with actual paths)
+    remove_button_image = Image.open("github_projects/button_colors/subtraction_background.png")
+    save_button_image = Image.open("github_projects/button_colors/green_button.png")
+    reset_button_image = Image.open("github_projects/button_colors/yellow_button.png")
+    scan_button_image = Image.open("github_projects/button_colors/scanner_button_im.png")
+    resized_remove_button_image = remove_button_image.resize((111, 31))
+    resized_save_button_image = save_button_image.resize((110, 30))
+    resized_reset_button_image = reset_button_image.resize((110, 30))
+    resized_scan_button_image = scan_button_image.resize((110, 30))
+    remove_button_photo = ImageTk.PhotoImage(resized_remove_button_image)
+    save_button_photo = ImageTk.PhotoImage(resized_save_button_image)
+    reset_button_photo = ImageTk.PhotoImage(resized_reset_button_image)
+    scan_button_photo = ImageTk.PhotoImage(resized_scan_button_image)
+    global_button_images['remove_button'] = remove_button_photo
+    global_button_images['save_button'] = save_button_photo
+    global_button_images['reset_button'] = reset_button_photo
+    global_button_images['scan_button'] = scan_button_photo  # Keep a reference
+
+    """
+    # Button styling with images
+    add_button = tk.Button(window, text="\u2795 Add Quantity", command=add_quantity, font=("Calibri", 9), image=add_button_photo, compound="center")
+    remove_button = tk.Button(window, text="\u2796 Remove Quantity", command=remove_quantity, font=("Calibri", 9), image=remove_button_photo, compound="center")
+    save_button = tk.Button(window, text="Save Changes", command=save_changes, font=("Calibri", 9), image=save_button_photo, compound="center")
+    reset_button = tk.Button(window, text="Reset", command=reset_quantity, font=("Calibri", 9), image=reset_button_photo, compound="center")
+    
+    # Keep a reference to the images
+    add_button.image = add_button_photo
+    remove_button.image = remove_button_photo
+    save_button.image = save_button_photo
+    reset_button.image = reset_button_photo
+    """
+
+
+    # Create and place buttons inside the frames
+    add_button = tk.Button(add_button_frame, text = "\u2795 Add Quantity", command = add_quantity, font = ("Calibri", 9), image = add_button_photo, compound = "center")
+    remove_button = tk.Button(remove_button_frame, text = "\u2796 Remove Quantity", command = remove_quantity, font = ("Calibri", 9), image = remove_button_photo, compound = "center")
+    save_button = tk.Button(save_button_frame, text = "Save Changes", command = save_changes, font = ("Calibri", 9), image = save_button_photo, compound = "center")
+    reset_button = tk.Button(reset_button_frame, text = "Reset", command = reset_quantity, font = ("Calibri", 9), image = reset_button_photo, compound = "center")
+    scan_button = tk.Button(scan_button_frame, text = " Search by code scan", command = scan_code, font = ("Calibri", 9), compound = "center")
+
 
     # Bind the item selection event to the item_selected function
     item_combobox.bind("<<ComboboxSelected>>", item_selected)
@@ -582,32 +667,55 @@ def main_app():
     # Bind the month_combobox to update the graph when the selection changes
     month_combobox.bind("<<ComboboxSelected>>", update_graph_for_month)
 
-    # Add a button for scanning
-    scan_button = tk.Button(window, text="Search by Code Scan", command=scan_code)
-    scan_button.grid(row=8, column=0, pady=5)  # Adjust grid position as needed
-
 
     # GUI components in the window using grid
-    item_combobox.grid(row=1, column=0, padx=10, pady=5, sticky='w')
-    quantity_label.grid(row=2, column=0, padx=10, pady=5, sticky='w')
-    quantity_change_label.grid(row=3, column=0, padx=0, pady=5, sticky='w')
-    quantity_change_entry.grid(row=3, column=0, padx=130, pady=5, sticky='w')
-    add_button.grid(row=4, column=0, pady=5)
-    remove_button.grid(row=5, column=0, pady=5, sticky='s')  
-    original_label.grid(row=2, column=0, padx=0, pady=5, sticky='w')  
-    new_label.grid(row=6, column=0, padx=0, pady=5, sticky='w')
-    save_button.grid(row=7, column=0, columnspan=2, padx=10, pady=5, sticky='w')
-    reset_button.grid(row=5, column=1, pady=5, sticky='w')  
+    item_combobox.grid(row = 1, column = 0, padx = 10, pady = 5, sticky = 'w')
+    quantity_label.grid(row = 2, column = 0, padx = 10, pady = 5, sticky = 'w')
+    quantity_change_label.grid(row = 3, column = 0, padx = 10, pady = 5, sticky = 'w')
+    quantity_change_entry.grid(row = 3, column = 0, padx = 140, pady = 5, sticky = 'w')
+    add_button.grid(row = 4, column = 0, pady = 5)
+    remove_button.grid(row = 5, column = 0, pady = 5, sticky = 's')  
+    original_label.grid(row = 2, column = 0, padx = 10, pady = 5, sticky = 'w')  
+    new_label.grid(row = 6, column = 0, padx = 10, pady = 5, sticky = 'w')
+    save_button.grid(row = 7, column = 0, columnspan = 2, padx = 10, pady = 5, sticky = 'w')
+    reset_button.grid(row = 5, column = 1, pady = 5, sticky = 'w')
+    # Add a button for scanning
+    # scan_button = tk.Button(window, text="Search by Code Scan", command=scan_code)
+    scan_button.grid(row = 2, column = 3, padx=50, pady = 5)  # Adjust grid position as needed
 
 
     # Title label for the Listbox
-    changes_title_label = tk.Label(window, text="Recent Changes", font=("Arial", 12, "bold"))
-    changes_title_label.grid(row=6, column=1, padx=10, pady=(10, 0), sticky='w')  # Adjust row, column, padx, pady as needed
+    changes_title_label = tk.Label(window, text="Recent Changes", font=("Arial", 12, "bold"),  background= 'light grey')
+    changes_title_label.grid(row = 6, column = 1, padx = 10, pady = (10, 0), sticky = 'w')  # Adjust row, column, padx, pady as needed
 
 
     # Listbox to display the changes
-    changes_listbox = tk.Listbox(window, width= 40, borderwidth=0, highlightthickness=0,)
-    changes_listbox.grid(row=7, column=1, rowspan=6, padx=10, pady=10, sticky='ns')
+    changes_listbox = tk.Listbox(window, width = 40, borderwidth = 0, highlightthickness = 0,)
+    changes_listbox.grid(row = 7, column = 1, rowspan = 6, padx = 10, pady = 10, sticky = 'ns')
+
+
+
+    # Pack buttons into their frames
+    add_button.pack()
+    remove_button.pack()
+    save_button.pack()
+    reset_button.pack()
+    scan_button.pack()
+
+    # Grid the frames in the main window
+    add_button_frame.grid(row = 4, column = 0, pady = 5)
+    remove_button_frame.grid(row = 5, column = 0, pady = 5, sticky = 's')
+    save_button_frame.grid(row = 7, column = 0, columnspan = 2, padx = 10, pady = 5, sticky = 'w')
+    reset_button_frame.grid(row = 5, column = 1, pady = 5, padx = 10, sticky = 'w')
+    scan_button_frame.grid(row = 1, column = 0, padx = (50, 0), pady = 5)  # Adjust grid position as needed
+
+
+
+    # Bind the hover events for each frame
+    for frame in [add_button_frame, remove_button_frame, save_button_frame, reset_button_frame]:
+        frame.bind("<Enter>", lambda e, f=frame: on_enter(e, f))
+        frame.bind("<Leave>", lambda e, f=frame: on_leave(e, f))
+
 
     # Start the GUI application
     window.mainloop()
