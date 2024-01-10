@@ -38,12 +38,6 @@ Graph Representation: Plots inventory changes over the selected time frame on a 
 ##### Some months are will not display daily data properly for specific months due to single change in inventory.
 ![image](https://github.com/jcast6/Inventory-Control/assets/89822103/08899777-4359-4b81-92b8-c40f7eece134)
 
-# Recent updates
-
-# QR code and Barcode scanner 
-Integration: Uses the cv2 and pyzbar libraries to scan QR codes and barcodes. On scanning, the system searches the database for the corresponding item and updates the GUI with relevant item information.
-![image](https://github.com/jcast6/Inventory-Control/assets/89822103/fad5b674-a697-4d91-87fc-26635a745d28)
-
 
 # Data returned from database when qr code is scanned
 Data Handling: The application parses the QR code data to retrieve the item's unique identifier. The GUI does not update to show the scanned item's details, it is currently being worked on. The item details display in the terminal as they are in the database when the qr code is scanned.
